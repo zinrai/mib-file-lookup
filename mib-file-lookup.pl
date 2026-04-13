@@ -2,7 +2,6 @@
 use strict;
 use warnings;
 use Getopt::Long;
-use File::Basename;
 use SNMP;
 
 my $debug = 0;
@@ -36,18 +35,29 @@ if ( !$node || !$node->{moduleID} ) {
 }
 
 my $module = $node->{moduleID};
+my @files  = map { glob("$_/*") } @mib_dirs;
 
-for my $dir (@mib_dirs) {
-    for my $file ( glob("$dir/*") ) {
-        my $base = fileparse( $file, qr/\.\w+$/ );
-        if ( lc($base) eq lc($module) ) {
-            print "$file\n";
-            exit 0;
-        }
+for my $file (@files) {
+    if ( file_defines_module( $file, $module ) ) {
+        print "$file\n";
+        exit 0;
     }
 }
 
 exit 1;
+
+sub file_defines_module {
+    my ( $file, $module ) = @_;
+    open my $fh, '<', $file or return 0;
+    while ( my $line = <$fh> ) {
+        if ( $line =~ /^\s*\Q$module\E\s+DEFINITIONS\s*::=\s*BEGIN/i ) {
+            close $fh;
+            return 1;
+        }
+    }
+    close $fh;
+    return 0;
+}
 
 sub usage {
     print STDERR
